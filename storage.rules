@@ -1,0 +1,24 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // In a real app, we would verify the user's role in Firestore, 
+    // but Storage rules can't easily read Firestore documents without custom claims.
+    // For this demo, we'll allow any authenticated user to upload images,
+    // but restrict the path and file type.
+    
+    match /inventory/{imageId} {
+      // Anyone can read images
+      allow read: if true;
+      
+      // Only allow image uploads under 5MB
+      allow write: if isAuthenticated() 
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

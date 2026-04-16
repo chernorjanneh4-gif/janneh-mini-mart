@@ -1,0 +1,131 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(ownerId) {
+      return isAuthenticated() && request.auth.uid == ownerId;
+    }
+
+    function isBranch() {
+      return isAuthenticated() && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function isBranchOf(ownerId) {
+      return isBranch() && exists(/databases/$(database)/documents/owners/$(ownerId)/branchSessions/$(request.auth.uid));
+    }
+
+    function isAuthorizedDevice(ownerId, deviceId) {
+      return exists(/databases/$(database)/documents/owners/$(ownerId)/authorizedDevices/$(deviceId));
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function isValidString(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+    
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string &&
+        dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /owners/{ownerId} {
+      // Owner profile
+      allow read: if isOwner(ownerId);
+      allow create: if isAuthenticated() && request.auth.uid == ownerId;
+      allow update: if isOwner(ownerId);
+
+      // Nested Collections for Strict Isolation
+      
+      match /branches/{branchId} {
+        allow read: if isOwner(ownerId) || isBranchOf(ownerId);
+        allow create, update: if isOwner(ownerId);
+        allow delete: if isOwner(ownerId);
+      }
+
+      match /inventory/{itemId} {
+        allow read: if isOwner(ownerId) || isBranchOf(ownerId);
+        allow create, update, delete: if isOwner(ownerId);
+      }
+
+      match /transactions/{transactionId} {
+        allow read: if isOwner(ownerId) || isBranchOf(ownerId);
+        allow create: if isBranchOf(ownerId) || isOwner(ownerId);
+        allow update, delete: if false;
+      }
+
+      match /staff/{staffId} {
+        allow read: if isOwner(ownerId) || isBranchOf(ownerId);
+        allow create, update, delete: if isOwner(ownerId);
+      }
+
+      match /reports/{reportId} {
+        allow read: if isOwner(ownerId);
+        allow create: if isOwner(ownerId) || isBranchOf(ownerId);
+        allow update, delete: if isOwner(ownerId);
+      }
+
+      match /branchSessions/{sessionId} {
+        // Branches can create their own sessions
+        allow create: if isBranch() && sessionId == request.auth.uid;
+        allow read, update: if isOwner(ownerId) || (isBranch() && sessionId == request.auth.uid);
+        allow delete: if isOwner(ownerId);
+      }
+
+      // Device Authorization
+      
+      match /authorizedDevices/{deviceId} {
+        allow read: if isOwner(ownerId) || (isAuthenticated() && request.auth.uid == ownerId);
+        allow create, update, delete: if isOwner(ownerId);
+      }
+
+      match /authorizationRequests/{requestId} {
+        // Anyone can create a request if they are trying to log in
+        allow create: if isAuthenticated() && request.auth.uid == ownerId;
+        allow read: if isOwner(ownerId);
+        allow update: if isOwner(ownerId);
+        allow delete: if isOwner(ownerId);
+      }
+
+      match /verificationCodes/{codeId} {
+        allow read: if isAuthenticated() && request.auth.uid == ownerId;
+        allow create: if isOwner(ownerId);
+        allow update, delete: if isOwner(ownerId);
+      }
+    }
+
+    // Global mapping for branch login
+    match /branchMappings/{branchId} {
+      allow read: if true;
+      // Only authenticated owners can create mappings
+      allow create: if isAuthenticated() && 
+                      request.auth.token.firebase.sign_in_provider != 'anonymous' &&
+                      request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && 
+                             request.auth.token.firebase.sign_in_provider != 'anonymous' &&
+                             resource.data.ownerId == request.auth.uid;
+    }
+  }
+}
