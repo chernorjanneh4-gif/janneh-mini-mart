@@ -1,0 +1,155 @@
+{
+  "entities": {
+    "Owner": {
+      "title": "Owner",
+      "description": "An owner of the mini-mart system.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "authorizedDevices": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["fullName", "email", "createdAt"]
+    },
+    "Branch": {
+      "title": "Branch",
+      "description": "A physical branch of the mini-mart.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "activeDeviceId": { "type": ["string", "null"] },
+        "branchId": { "type": "string", "description": "Short ID for login" }
+      },
+      "required": ["name", "location", "status", "createdAt", "branchId"]
+    },
+    "InventoryItem": {
+      "title": "InventoryItem",
+      "description": "An item in the inventory.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "price": { "type": "number" },
+        "quantity": { "type": "number" },
+        "weight": { "type": "number" },
+        "imageUrl": { "type": "string", "format": "uri" },
+        "expiryDate": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "category", "price", "quantity"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A sales transaction.",
+      "type": "object",
+      "properties": {
+        "transactionId": { "type": "string" },
+        "branchId": { "type": "string" },
+        "staffId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "totalAmount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["Cash", "Card", "Mobile Money"] },
+        "items": { "type": "array", "items": { "type": "object" } }
+      },
+      "required": ["transactionId", "branchId", "staffId", "date", "totalAmount", "paymentMethod", "items"]
+    },
+    "Staff": {
+      "title": "Staff",
+      "description": "A staff member.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "branchId": { "type": "string" },
+        "staffId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "branchId", "staffId", "createdAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "A support report or issue.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "branchId": { "type": "string" },
+        "email": { "type": "string" }
+      },
+      "required": ["type", "subject", "message", "status", "createdAt"]
+    },
+    "AuthorizationRequest": {
+      "title": "AuthorizationRequest",
+      "description": "A request to authorize a new device.",
+      "type": "object",
+      "properties": {
+        "deviceId": { "type": "string" },
+        "deviceType": { "type": "string" },
+        "location": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "approved", "denied"] }
+      },
+      "required": ["deviceId", "timestamp", "status"]
+    },
+    "VerificationCode": {
+      "title": "VerificationCode",
+      "description": "A 6-digit verification code.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "used": { "type": "boolean" }
+      },
+      "required": ["code", "expiresAt", "used"]
+    }
+  },
+  "firestore": {
+    "/owners/{ownerId}": {
+      "schema": { "$ref": "#/entities/Owner" },
+      "description": "Owner profiles."
+    },
+    "/owners/{ownerId}/branches/{branchId}": {
+      "schema": { "$ref": "#/entities/Branch" },
+      "description": "Branches belonging to an owner."
+    },
+    "/owners/{ownerId}/inventory/{itemId}": {
+      "schema": { "$ref": "#/entities/InventoryItem" },
+      "description": "Inventory items belonging to an owner."
+    },
+    "/owners/{ownerId}/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Transactions belonging to an owner."
+    },
+    "/owners/{ownerId}/staff/{staffId}": {
+      "schema": { "$ref": "#/entities/Staff" },
+      "description": "Staff belonging to an owner."
+    },
+    "/owners/{ownerId}/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/Report" },
+      "description": "Reports belonging to an owner."
+    },
+    "/owners/{ownerId}/authorizationRequests/{requestId}": {
+      "schema": { "$ref": "#/entities/AuthorizationRequest" },
+      "description": "Device authorization requests."
+    },
+    "/owners/{ownerId}/verificationCodes/{codeId}": {
+      "schema": { "$ref": "#/entities/VerificationCode" },
+      "description": "One-time verification codes."
+    },
+    "/owners/{ownerId}/authorizedDevices/{deviceId}": {
+      "schema": { "type": "object", "properties": { "authorizedAt": { "type": "string" } } },
+      "description": "List of authorized device IDs for an owner."
+    },
+    "/branchMappings/{branchId}": {
+      "schema": { "type": "object", "properties": { "ownerId": { "type": "string" } } },
+      "description": "Global mapping of branchId to ownerId for login."
+    }
+  }
+}
